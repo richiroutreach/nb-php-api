@@ -67,6 +67,13 @@ class NationbuilderAPI extends OAuth2\client {
 	protected $type;
 
 	/**
+	 * The slug of the subnation
+	 *
+	 * @var string
+	 */
+	protected $subNation;
+
+	/**
 	 * Construct
 	 *
 	 * @param 	string 	$siteSlug		Slug of the nation to interact with 
@@ -78,7 +85,7 @@ class NationbuilderAPI extends OAuth2\client {
 	 * @param	string	$endpoint		The NB Endpoint to use
 	 * @return 	void
 	 */
-	public function __construct($siteSlug, $id, $secret, $redirectURI = null, $token = null, $code = null, $endpoint = null) {
+	public function __construct($siteSlug, $id, $secret, $subNation = null, $redirectURI = null, $token = null, $code = null, $endpoint = null) {
 		$this->siteSlug = $siteSlug;
 		$this->clientID = $id;
 		$this->clientSecret = $secret;
@@ -86,6 +93,7 @@ class NationbuilderAPI extends OAuth2\client {
 		$this->code = $code;
 		$this->redirectURI = $redirectURI;
 		$this->type = $endpoint;
+		$this->subNation = $subNation;
 
 		parent::__construct($id, $secret);
 	}
@@ -185,7 +193,16 @@ class NationbuilderAPI extends OAuth2\client {
 	public function doRequest( $httpMethod = 'GET', $endpointMethod = null, $params = null ) {
 		$this->setToken();
 
-		return $this->fetch( 'https:// '. $this->siteSlug . '.nationbuilder.com/api/v1/' . $this->type . '/' .  $endpointMethod, $params, $httpMethod, $this->setHeader() );
+		$slug = 'https://'. $this->siteSlug . '.nationbuilder.com/api/v1/';
+
+		if( strlen( $this->subNation ) > 0 && $this->type != "people" ) {
+			$slug .= 'sites/' . $this->subNation . '/';
+		}
+		
+		//echo $slug . $this->type . '/' .  $endpointMethod;
+		//return array('slug' => $slug . $this->type . '/' .  $endpointMethod, 'params' => $params);
+
+		return $this->fetch( $slug . $this->type . '/' .  $endpointMethod, $params, $httpMethod, $this->setHeader() );
 	}
 
 	/**
@@ -207,7 +224,7 @@ class NationbuilderAPI extends OAuth2\client {
 		$this->setAccessToken( $this->token );
 
 		// Set the token type in the OAuth2 Client
-		$this->setAccessTokenType(1);		
+		$this->setAccessTokenType(1);
 	}
 
 	/**
@@ -279,11 +296,73 @@ class NationbuilderAPI extends OAuth2\client {
 	}
 }
 
-class People extends NationbuilderAPI {
-	public function __construct($siteSlug, $id, $secret, $redirectURI = null, $token = null, $code = null) {
-		parent::__construct($siteSlug, $id, $secret, $redirectURI = null, $token, $code);
+class Nation extends NationbuilderAPI {
+	public function __construct($siteSlug, $id, $secret, $subNation = null, $redirectURI = null, $token = null, $code = null) {
+		parent::__construct($siteSlug, $id, $secret, $subNation, $redirectURI, $token, $code);
+	}
 
-		$this->setEndpoint('people');
+	public function getSites() {
+		$this->setEndpoint('sites');
+
+		return $this->doRequest( 'GET' );
+	}
+
+	public function getContactTypes() {
+		$this->setEndpoint('settings');
+
+		return $this->doRequest( 'GET', "contact_types ");
+	}
+
+	public function getContactMethods() {
+		$this->setEndpoint('settings');
+
+		return $this->doRequest( 'GET', "contact_methods ");
+	}
+
+	public function getContactStatuses() {
+		$this->setEndpoint('settings');
+
+		return $this->doRequest( 'GET', "contact_statuses ");
+	}
+}
+
+
+class People extends NationbuilderAPI {
+	public function __construct($siteSlug, $id, $secret, $subNation = null, $redirectURI = null, $token = null, $code = null) {
+		parent::__construct($siteSlug, $id, $secret, null, $redirectURI, $token, $code, 'people');
+	}
+
+	public function create($params) {
+		return $this->push($params);
+	}
+
+	public function me() {
+		return $this->doRequest( 'GET', 'me' );
+	}
+}
+
+class BasicPages extends NationbuilderAPI {
+	public function __construct($siteSlug, $id, $secret, $redirectURI = null, $token = null, $code = null) {
+		parent::__construct($siteSlug, $id, $secret, $redirectURI, $token, $code, 'pages');
+	}
+
+	public function create($params) {
+		return $this->doRequest( 'POST', 'basic_pages', json_encode( $params) );	
+	}
+
+	public function delete($params) {
+		return $this->doRequest( 'DELETE', 'basic_pages/' . $params);
+	}
+}
+
+class Blogs extends NationBuilderAPI {
+	public function __construct($siteSlug, $id, $secret, $subNation = null, $redirectURI = null, $token = null, $code = null) {
+
+		parent::__construct($siteSlug, $id, $secret, $subNation, $redirectURI, $token, $code, 'pages');
+	}
+
+	public function index() {
+		return $this->doRequest( 'GET', 'blogs' );
 	}
 }
 
